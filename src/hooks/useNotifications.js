@@ -1,5 +1,5 @@
-// src/hooks/useNotifications.js
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 
 export const useNotifications = () => {
 	const [notifications, setNotifications] = useState(() => {
@@ -21,6 +21,13 @@ export const useNotifications = () => {
 			isRead: false,
 			...notification,
 		};
+
+		// Show toast for new notifications
+		toast[notification.type || "info"](notification.message, {
+			position: "top-right",
+			autoClose: 3000,
+		});
+
 		setNotifications((prev) => [newNotification, ...prev]);
 	};
 

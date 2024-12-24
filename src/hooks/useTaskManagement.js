@@ -1,152 +1,236 @@
 import { useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
 
-const INITIAL_TASKS = {
-	"To Do": [
-		{
-			id: "1",
-			title: "Research competitors",
-			priority: "high",
-			dueDate: "2024-12-01",
-			assignee: "John Doe",
-		},
-	],
-	"In Progress": [],
-	Review: [],
-	Done: [],
-};
-
-export const useTaskManagement = () => {
+export const useTaskManager = () => {
+	// Initialize tasks from localStorage or with default structure
 	const [tasks, setTasks] = useState(() => {
-		try {
-			const savedTasks = localStorage.getItem("tasks");
-			return savedTasks ? JSON.parse(savedTasks) : INITIAL_TASKS;
-		} catch (error) {
-			console.error("Error loading tasks from localStorage:", error);
-			return INITIAL_TASKS;
-		}
+		const savedTasks = localStorage.getItem("tasks");
+		return savedTasks
+			? JSON.parse(savedTasks)
+			: {
+					"To Do": [],
+					"In Progress": [],
+					Review: [],
+					Done: [],
+			  };
 	});
 
-	useEffect(() => {
-		try {
-			// Only store the necessary task data
-			const tasksToStore = Object.keys(tasks).reduce((acc, columnId) => {
-				acc[columnId] = tasks[columnId].map((task) => ({
-					id: task.id,
-					title: task.title,
-					priority: task.priority,
-					dueDate: task.dueDate,
-					assignee: task.assignee,
-				}));
-				return acc;
-			}, {});
+	// Initialize projects from localStorage
+	const [projects, setProjects] = useState(() => {
+		const savedProjects = localStorage.getItem("projects");
+		return savedProjects ? JSON.parse(savedProjects) : [];
+	});
 
-			localStorage.setItem("tasks", JSON.stringify(tasksToStore));
-		} catch (error) {
-			console.error("Error saving tasks to localStorage:", error);
-		}
+	// Initialize team from localStorage
+	const [team, setTeam] = useState(() => {
+		const savedTeam = localStorage.getItem("team");
+		return savedTeam ? JSON.parse(savedTeam) : [];
+	});
+
+	// Initialize events from localStorage
+	const [events, setEvents] = useState(() => {
+		const savedEvents = localStorage.getItem("events");
+		return savedEvents ? JSON.parse(savedEvents) : [];
+	});
+
+	// Save tasks to localStorage whenever they change
+	useEffect(() => {
+		localStorage.setItem("tasks", JSON.stringify(tasks));
 	}, [tasks]);
 
-	const addTask = (task) => {
-		if (!task?.title) return;
+	useEffect(() => {
+		localStorage.setItem("projects", JSON.stringify(projects));
+	}, [projects]);
 
+	useEffect(() => {
+		localStorage.setItem("team", JSON.stringify(team));
+	}, [team]);
+
+	useEffect(() => {
+		localStorage.setItem("events", JSON.stringify(events));
+	}, [events]);
+
+	// Add a new task
+	const addTask = (taskData, column = "To Do") => {
 		const newTask = {
-			...task,
-			id: task.id || Date.now().toString(),
-			priority: task.priority || "medium",
-			dueDate: task.dueDate || new Date().toISOString().split("T")[0],
-			assignee: task.assignee || "",
+			id: uuidv4(),
+			title: taskData.title,
+			description: taskData.description || "",
+			priority: taskData.priority || "medium",
+			dueDate: taskData.dueDate || new Date().toISOString().split("T")[0],
+			assignee: taskData.assignee || null,
+			status: taskData.status || column,
+			createdAt: new Date().toISOString(),
+			projectId: taskData.projectId || null,
+			tags: taskData.tags || [],
 		};
 
-		setTasks((prev) => ({
-			...prev,
-			"To Do": [...(prev["To Do"] || []), newTask],
-		}));
-	};
-	const updateTask = (taskId, columnId, updatedTask) => {
-		if (!taskId || !columnId || !updatedTask) return;
+		setTasks((prevTasks) => {
+			const updatedTasks = { ...prevTasks };
+			updatedTasks[column] = [...(updatedTasks[column] || []), newTask];
+			return updatedTasks;
+		});
 
-		const safeTask = {
-			id: taskId,
-			title: updatedTask.title,
-			priority: updatedTask.priority,
-			dueDate: updatedTask.dueDate,
-			assignee: updatedTask.assignee,
-		};
-
-		setTasks((prev) => ({
-			...prev,
-			[columnId]: (prev[columnId] || []).map((task) => (task.id === taskId ? { ...task, ...safeTask } : task)),
-		}));
+		return newTask;
 	};
 
+	// Update an existing task
+	const updateTask = (taskId, columnId, updatedData) => {
+		setTasks((prevTasks) => {
+			const updatedTasks = { ...prevTasks };
+			const column = updatedTasks[columnId];
+			const taskIndex = column.findIndex((task) => task.id === taskId);
+
+			if (taskIndex === -1) return prevTasks;
+
+			if (updatedData.status && updatedData.status !== columnId) {
+				// Task is moving to a new column
+				const [movedTask] = column.splice(taskIndex, 1);
+				const updatedTask = {
+					...movedTask,
+					...updatedData,
+					updatedAt: new Date().toISOString(),
+				};
+				updatedTasks[updatedData.status] = [...(updatedTasks[updatedData.status] || []), updatedTask];
+			} else {
+				// Task is being updated in the same column
+				column[taskIndex] = {
+					...column[taskIndex],
+					...updatedData,
+					updatedAt: new Date().toISOString(),
+				};
+			}
+
+			return updatedTasks;
+		});
+	};
+
+	// Delete a task
 	const deleteTask = (columnId, taskId) => {
-		if (!columnId || !taskId) return;
-
-		setTasks((prev) => ({
-			...prev,
-			[columnId]: (prev[columnId] || []).filter((task) => task.id !== taskId),
-		}));
-	};
-
-	const moveTask = (taskId, fromStatus, toStatus) => {
-		if (!taskId || !fromStatus || !toStatus) return;
-
-		setTasks((prev) => {
-			const taskToMove = prev[fromStatus]?.find((task) => task.id === taskId);
-			if (!taskToMove) return prev;
-
-			const safeTask = {
-				id: taskToMove.id,
-				title: taskToMove.title,
-				priority: taskToMove.priority,
-				dueDate: taskToMove.dueDate,
-				assignee: taskToMove.assignee,
-			};
-
-			return {
-				...prev,
-				[fromStatus]: prev[fromStatus].filter((task) => task.id !== taskId),
-				[toStatus]: [...(prev[toStatus] || []), safeTask],
-			};
+		setTasks((prevTasks) => {
+			const updatedTasks = { ...prevTasks };
+			updatedTasks[columnId] = updatedTasks[columnId].filter((task) => task.id !== taskId);
+			return updatedTasks;
 		});
 	};
 
+	// Handle drag and drop
 	const handleDragEnd = (result) => {
-		if (!result?.destination) return;
+		const { source, destination, draggableId } = result;
 
-		const { source, destination } = result;
+		// Return if dropped outside or in same position
+		if (!destination) return;
+		if (destination.droppableId === source.droppableId && destination.index === source.index) {
+			return;
+		}
 
-		setTasks((prev) => {
-			const sourceColumn = [...(prev[source.droppableId] || [])];
-			const destColumn = [...(prev[destination.droppableId] || [])];
+		setTasks((prevTasks) => {
+			// Create copies of the source and destination columns
+			const sourceCol = Array.from(prevTasks[source.droppableId]);
+			const destCol = source.droppableId === destination.droppableId ? sourceCol : Array.from(prevTasks[destination.droppableId] || []);
 
-			if (!sourceColumn || !destColumn) return prev;
+			// Find and remove the task from the source column
+			const [movedTask] = sourceCol.splice(source.index, 1);
 
-			const [removed] = sourceColumn.splice(source.index, 1);
-			const safeTask = {
-				id: removed.id,
-				title: removed.title,
-				priority: removed.priority,
-				dueDate: removed.dueDate,
-				assignee: removed.assignee,
+			// Update the task's status and add to destination
+			const updatedTask = {
+				...movedTask,
+				status: destination.droppableId,
+				updatedAt: new Date().toISOString(),
 			};
 
-			destColumn.splice(destination.index, 0, safeTask);
+			// Insert the task at the new position
+			if (source.droppableId === destination.droppableId) {
+				sourceCol.splice(destination.index, 0, updatedTask);
+			} else {
+				destCol.splice(destination.index, 0, updatedTask);
+			}
 
+			// Return the updated tasks state
 			return {
-				...prev,
-				[source.droppableId]: sourceColumn,
-				[destination.droppableId]: destColumn,
+				...prevTasks,
+				[source.droppableId]: sourceCol,
+				[destination.droppableId]: source.droppableId === destination.droppableId ? sourceCol : destCol,
 			};
 		});
+	};
+
+	// Project management functions
+	const addProject = (projectData) => {
+		const newProject = {
+			id: uuidv4(),
+			...projectData,
+			createdAt: new Date().toISOString(),
+		};
+		setProjects((prevProjects) => [...prevProjects, newProject]);
+		return newProject;
+	};
+
+	const updateProject = (projectId, updatedData) => {
+		setProjects((prevProjects) => prevProjects.map((project) => (project.id === projectId ? { ...project, ...updatedData, updatedAt: new Date().toISOString() } : project)));
+	};
+
+	const deleteProject = (projectId) => {
+		setProjects((prevProjects) => prevProjects.filter((project) => project.id !== projectId));
+	};
+
+	// Team management functions
+	const addTeamMember = (memberData) => {
+		const newMember = {
+			id: uuidv4(),
+			...memberData,
+			createdAt: new Date().toISOString(),
+		};
+		setTeam((prevTeam) => [...prevTeam, newMember]);
+		return newMember;
+	};
+
+	const updateTeamMember = (memberId, updatedData) => {
+		setTeam((prevTeam) => prevTeam.map((member) => (member.id === memberId ? { ...member, ...updatedData, updatedAt: new Date().toISOString() } : member)));
+	};
+
+	const deleteTeamMember = (memberId) => {
+		setTeam((prevTeam) => prevTeam.filter((member) => member.id !== memberId));
+	};
+
+	// Event management functions
+	const addEvent = (eventData) => {
+		const newEvent = {
+			id: uuidv4(),
+			...eventData,
+			createdAt: new Date().toISOString(),
+		};
+		setEvents((prevEvents) => [...prevEvents, newEvent]);
+		return newEvent;
+	};
+
+	const updateEvent = (eventId, updatedData) => {
+		setEvents((prevEvents) => prevEvents.map((event) => (event.id === eventId ? { ...event, ...updatedData, updatedAt: new Date().toISOString() } : event)));
+	};
+
+	const deleteEvent = (eventId) => {
+		setEvents((prevEvents) => prevEvents.filter((event) => event.id !== eventId));
 	};
 
 	return {
 		tasks,
+		projects,
+		team,
+		events,
 		addTask,
 		updateTask,
 		deleteTask,
-		moveTask,
 		handleDragEnd,
+		addProject,
+		updateProject,
+		deleteProject,
+		addTeamMember,
+		updateTeamMember,
+		deleteTeamMember,
+		addEvent,
+		updateEvent,
+		deleteEvent,
 	};
 };
+
+export default useTaskManager;
