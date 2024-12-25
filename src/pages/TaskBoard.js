@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
-import { Plus, MoreVertical, Edit, Trash2, Filter, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useTaskContext } from "../context/TaskContext";
 
 const TaskBoard = ({ tasks, onAddTask, onUpdateTask, onDeleteTask }) => {
 	// State for modal, filters, and search
@@ -100,6 +102,16 @@ const TaskBoard = ({ tasks, onAddTask, onUpdateTask, onDeleteTask }) => {
 
 	// Task Card Component
 	const TaskCard = ({ task, index, columnId }) => {
+		const { projects, team } = useTaskContext();
+
+		const getProject = (projectId) => {
+			return projects.find((p) => p.id === projectId);
+		};
+
+		const getAssignee = (assigneeId) => {
+			return team.find((m) => m.id === assigneeId);
+		};
+
 		const getPriorityColor = (priority) => {
 			switch (priority) {
 				case "high":
@@ -113,21 +125,15 @@ const TaskBoard = ({ tasks, onAddTask, onUpdateTask, onDeleteTask }) => {
 			}
 		};
 
+		const project = getProject(task.projectId);
+		const assignee = getAssignee(task.assignedTo);
+
 		return (
 			<Draggable draggableId={task.id} index={index}>
 				{(provided, snapshot) => (
-					<div
-						ref={provided.innerRef}
-						{...provided.draggableProps}
-						{...provided.dragHandleProps}
-						className={`
-				  bg-white rounded-md shadow-sm p-4 mb-3 
-				  ${getPriorityColor(task.priority)}
-				  ${snapshot.isDragging ? "ring-2 ring-blue-500" : ""}
-				`}
-					>
+					<div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`bg-white rounded-md shadow-sm p-4 mb-3 ${getPriorityColor(task.priority)} ${snapshot.isDragging ? "ring-2 ring-blue-500" : ""}`}>
 						<div className="flex justify-between items-start mb-2">
-							<h3 className="font-medium text-gray-800">{task.title}</h3>
+							<h3 className="font-medium text-gray-900">{task.title}</h3>
 							<div className="flex space-x-2">
 								<button
 									onClick={() => {
@@ -138,32 +144,34 @@ const TaskBoard = ({ tasks, onAddTask, onUpdateTask, onDeleteTask }) => {
 								>
 									<Edit className="w-4 h-4" />
 								</button>
-								<button onClick={() => onDeleteTask(columnId, task.id)} className="text-gray-500 hover:text-red-600">
+								<button
+									onClick={() => {
+										if (window.confirm("Are you sure you want to delete this task?")) {
+											deleteTask(columnId, task.id);
+											toast.success("Task deleted successfully");
+										}
+									}}
+									className="text-gray-500 hover:text-red-600"
+								>
 									<Trash2 className="w-4 h-4" />
 								</button>
 							</div>
 						</div>
 
-						<div className="flex justify-between items-center text-sm text-gray-500">
-							{/* Safely render priority */}
-							<span
-								className={`
-					  px-2 py-1 rounded-full text-xs 
-					  ${task.priority === "high" ? "bg-red-100 text-red-800" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}
-					`}
-							>
-								{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
-							</span>
+						{project && <div className="text-xs text-gray-500 mb-2">Project: {project.name}</div>}
 
-							{/* Safely render assignee */}
-							{task.assignee && <span className="text-xs">{task.assignee.name || "Unassigned"}</span>}
+						<div className="flex items-center justify-between text-sm">
+							<span className={`px-2 py-1 rounded-full text-xs font-medium ${task.priority === "high" ? "bg-red-100 text-red-800" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</span>
+
+							{assignee && (
+								<div className="flex items-center">
+									<div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">{assignee.name.charAt(0)}</div>
+									<span className="ml-2 text-xs text-gray-600">{assignee.name}</span>
+								</div>
+							)}
 						</div>
 
-						{/* Safely render project */}
-						{task.project && <div className="text-xs text-gray-400 mt-2">Project: {task.project.name || "Unnamed Project"}</div>}
-
-						{/* Render due date */}
-						{task.dueDate && <div className="text-xs text-gray-400 mt-1">Due: {new Date(task.dueDate).toLocaleDateString()}</div>}
+						<div className="mt-2 text-xs text-gray-500">Due: {new Date(task.dueDate).toLocaleDateString()}</div>
 					</div>
 				)}
 			</Draggable>

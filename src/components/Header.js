@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Menu, User, Settings, LogOut, ChevronDown, Search } from "lucide-react";
+import { Bell, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 

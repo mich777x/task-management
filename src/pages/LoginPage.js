@@ -137,7 +137,7 @@ const LoginPage = () => {
 								Password
 							</label>
 							<div className="mt-1 relative">
-								<input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+								<input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="123" className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
 								<Lock className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
 								<button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
 									{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -155,7 +155,7 @@ const LoginPage = () => {
 							</div>
 
 							<div className="text-sm">
-								<a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+								<a href="X" className="font-medium text-blue-600 hover:text-blue-500">
 									Forgot your password?
 								</a>
 							</div>

@@ -1,221 +1,252 @@
 import React, { useState, useEffect } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Calendar, Clock, Users, Folder, Activity, AlertTriangle } from "lucide-react";
 import { useTaskContext } from "../context/TaskContext";
-
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+import { useNavigate } from "react-router-dom";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { TrendingUp, Users, Calendar, CheckCircle, Activity } from "lucide-react";
 
 const Dashboard = () => {
-	const { tasks, projects, team, events } = useTaskContext();
+	const navigate = useNavigate();
+	const { tasks, projects, team, events = [] } = useTaskContext();
 	const [taskMetrics, setTaskMetrics] = useState({});
-	const [projectStats, setProjectStats] = useState([]);
-	const [teamActivity, setTeamActivity] = useState([]);
-	const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
+	const [projectMetrics, setProjectMetrics] = useState({});
+	const [teamMetrics, setTeamMetrics] = useState({});
 
+	// Calculate metrics whenever data changes
 	useEffect(() => {
-		calculateTaskMetrics();
-		generateProjectStats();
-		analyzeTeamActivity();
-		getUpcomingDeadlines();
-	}, [tasks, projects, team, events]);
+		// Task Metrics
+		const allTasks = Object.values(tasks || {}).flat();
+		const totalTasks = allTasks.length;
+		const completedTasks = (tasks?.["Done"] || []).length;
+		const inProgressTasks = (tasks?.["In Progress"] || []).length;
+		const pendingTasks = (tasks?.["To Do"] || []).length;
+		const reviewTasks = (tasks?.["Review"] || []).length;
 
-	const calculateTaskMetrics = () => {
-		const allTasks = Object.values(tasks).flat();
-		const today = new Date();
-		const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+		const tasksByPriority = allTasks.reduce((acc, task) => {
+			acc[task.priority] = (acc[task.priority] || 0) + 1;
+			return acc;
+		}, {});
 
-		const metrics = {
-			total: allTasks.length,
-			completed: tasks["Done"]?.length || 0,
-			inProgress: tasks["In Progress"]?.length || 0,
-			overdue: allTasks.filter((task) => new Date(task.dueDate) < today && task.status !== "Done").length,
-			completedThisWeek: tasks["Done"]?.filter((task) => new Date(task.completedAt) > thisWeek).length || 0,
-			highPriority: allTasks.filter((task) => task.priority === "high").length,
-		};
+		// Project Metrics
+		const activeProjects = (projects || []).filter((p) => p.status === "in-progress").length;
+		const completedProjects = (projects || []).filter((p) => p.status === "completed").length;
+		const projectProgress = (projects || []).reduce(
+			(acc, project) => {
+				acc.total += project.progress || 0;
+				return acc;
+			},
+			{ total: 0 }
+		);
 
-		setTaskMetrics(metrics);
-	};
+		const avgProjectProgress = projects?.length ? (projectProgress.total / projects.length).toFixed(1) : 0;
 
-	const generateProjectStats = () => {
-		const projectProgress = projects.map((project) => ({
-			name: project.name,
-			completed: project.completedTasks || 0,
-			total: project.totalTasks || 0,
-			progress: Math.round(((project.completedTasks || 0) / (project.totalTasks || 1)) * 100),
-		}));
+		// Team Metrics
+		const departmentDistribution = (team || []).reduce((acc, member) => {
+			acc[member.department] = (acc[member.department] || 0) + 1;
+			return acc;
+		}, {});
 
-		setProjectStats(projectProgress);
-	};
+		setTaskMetrics({
+			total: totalTasks,
+			completed: completedTasks,
+			inProgress: inProgressTasks,
+			pending: pendingTasks,
+			review: reviewTasks,
+			completionRate: totalTasks ? ((completedTasks / totalTasks) * 100).toFixed(1) : 0,
+			byPriority: tasksByPriority,
+		});
 
-	const analyzeTeamActivity = () => {
-		const memberActivity = team.map((member) => ({
-			name: member.name,
-			tasksCompleted: tasks["Done"]?.filter((task) => task.assignee?.id === member.id).length || 0,
-			tasksInProgress: tasks["In Progress"]?.filter((task) => task.assignee?.id === member.id).length || 0,
-		}));
+		setProjectMetrics({
+			total: projects?.length || 0,
+			active: activeProjects,
+			completed: completedProjects,
+			avgProgress: avgProjectProgress,
+		});
 
-		setTeamActivity(memberActivity);
-	};
+		setTeamMetrics({
+			total: team?.length || 0,
+			departments: departmentDistribution,
+			activeMembers: (team || []).filter((m) => m.status === "online").length,
+		});
+	}, [tasks, projects, team]);
 
-	const getUpcomingDeadlines = () => {
-		const today = new Date();
-		const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+	// Chart colors
+	const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
-		const deadlines = Object.values(tasks)
-			.flat()
-			.filter((task) => {
-				const dueDate = new Date(task.dueDate);
-				return dueDate >= today && dueDate <= nextWeek && task.status !== "Done";
-			})
-			.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-		setUpcomingDeadlines(deadlines.slice(0, 5));
-	};
-
-	// Calculate project distribution data
-	const projectStatusData = [
-		{ name: "Planning", value: projects.filter((p) => p.status === "planning").length },
-		{ name: "In Progress", value: projects.filter((p) => p.status === "in-progress").length },
-		{ name: "Review", value: projects.filter((p) => p.status === "review").length },
-		{ name: "Completed", value: projects.filter((p) => p.status === "completed").length },
+	// Task distribution data
+	const taskDistributionData = [
+		{ name: "To Do", value: taskMetrics.pending || 0 },
+		{ name: "In Progress", value: taskMetrics.inProgress || 0 },
+		{ name: "Review", value: taskMetrics.review || 0 },
+		{ name: "Done", value: taskMetrics.completed || 0 },
 	];
 
+	// Project progress data
+	const projectProgressData = (projects || []).map((project) => ({
+		name: project.name,
+		progress: project.progress || 0,
+	}));
+
+	// Team activity data (last 7 days)
+	const getTeamActivityData = () => {
+		const today = new Date();
+		const last7Days = new Array(7).fill(0).map((_, index) => {
+			const date = new Date();
+			date.setDate(today.getDate() - (6 - index));
+			return date.toISOString().split("T")[0];
+		});
+
+		return last7Days.map((date) => {
+			const dayTasks = Object.values(tasks || {})
+				.flat()
+				.filter((task) => task.createdAt?.startsWith(date));
+
+			return {
+				date,
+				tasks: dayTasks.length,
+				completed: dayTasks.filter((task) => task.status === "Done").length,
+			};
+		});
+	};
+
 	return (
-		<div className="space-y-6 p-6">
-			{/* Quick Stats */}
+		<div className="space-y-6">
+			{/* Clickable Stats Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-				<div className="bg-white rounded-xl p-6 shadow-sm">
+				<div onClick={() => navigate("/tasks")} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all">
 					<div className="flex items-center justify-between">
 						<div>
-							<p className="text-gray-500 text-sm">Total Tasks</p>
+							<p className="text-sm text-gray-500">Total Tasks</p>
 							<h3 className="text-2xl font-bold mt-1">{taskMetrics.total}</h3>
-							<p className="text-sm text-gray-600 mt-1">{taskMetrics.completedThisWeek} completed this week</p>
+							<p className="text-sm text-green-600 mt-2 flex items-center">
+								<TrendingUp className="w-4 h-4 mr-1" />+{taskMetrics.completionRate}% completed
+							</p>
 						</div>
-						<div className="bg-blue-100 p-3 rounded-full">
+						<div className="p-3 bg-blue-50 rounded-full">
 							<Activity className="w-6 h-6 text-blue-600" />
 						</div>
 					</div>
 				</div>
 
-				<div className="bg-white rounded-xl p-6 shadow-sm">
+				<div onClick={() => navigate("/projects")} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all">
 					<div className="flex items-center justify-between">
 						<div>
-							<p className="text-gray-500 text-sm">Active Projects</p>
-							<h3 className="text-2xl font-bold mt-1">{projects.filter((p) => p.status !== "completed").length}</h3>
-							<p className="text-sm text-gray-600 mt-1">{projects.filter((p) => p.status === "in-progress").length} in progress</p>
+							<p className="text-sm text-gray-500">Active Projects</p>
+							<h3 className="text-2xl font-bold mt-1">{projectMetrics.active}</h3>
+							<p className="text-sm text-blue-600 mt-2">Avg. Progress: {projectMetrics.avgProgress}%</p>
 						</div>
-						<div className="bg-green-100 p-3 rounded-full">
-							<Folder className="w-6 h-6 text-green-600" />
+						<div className="p-3 bg-green-50 rounded-full">
+							<CheckCircle className="w-6 h-6 text-green-600" />
 						</div>
 					</div>
 				</div>
 
-				<div className="bg-white rounded-xl p-6 shadow-sm">
+				<div onClick={() => navigate("/team")} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all">
 					<div className="flex items-center justify-between">
 						<div>
-							<p className="text-gray-500 text-sm">Team Members</p>
-							<h3 className="text-2xl font-bold mt-1">{team.length}</h3>
-							<p className="text-sm text-gray-600 mt-1">{team.filter((m) => m.status === "active").length} active now</p>
+							<p className="text-sm text-gray-500">Team Members</p>
+							<h3 className="text-2xl font-bold mt-1">{teamMetrics.total}</h3>
+							<p className="text-sm text-emerald-600 mt-2">{teamMetrics.activeMembers} members online</p>
 						</div>
-						<div className="bg-purple-100 p-3 rounded-full">
-							<Users className="w-6 h-6 text-purple-600" />
+						<div className="p-3 bg-yellow-50 rounded-full">
+							<Users className="w-6 h-6 text-yellow-600" />
 						</div>
 					</div>
 				</div>
 
-				<div className="bg-white rounded-xl p-6 shadow-sm">
+				<div onClick={() => navigate("/calendar")} className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all">
 					<div className="flex items-center justify-between">
 						<div>
-							<p className="text-gray-500 text-sm">Upcoming Events</p>
-							<h3 className="text-2xl font-bold mt-1">{events.length}</h3>
-							<p className="text-sm text-gray-600 mt-1">{events.filter((e) => new Date(e.start) > new Date()).length} this week</p>
+							<p className="text-sm text-gray-500">Upcoming Events</p>
+							<h3 className="text-2xl font-bold mt-1">{events.filter((e) => new Date(e.start) > new Date()).length}</h3>
+							<p className="text-sm text-purple-600 mt-2">Next 7 days</p>
 						</div>
-						<div className="bg-yellow-100 p-3 rounded-full">
-							<Calendar className="w-6 h-6 text-yellow-600" />
+						<div className="p-3 bg-purple-50 rounded-full">
+							<Calendar className="w-6 h-6 text-purple-600" />
 						</div>
 					</div>
 				</div>
 			</div>
-
 			{/* Charts Row */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{/* Project Progress Chart */}
-				<div className="bg-white rounded-xl p-6 shadow-sm">
-					<h3 className="text-lg font-semibold mb-4">Project Progress</h3>
-					<ResponsiveContainer width="100%" height={300}>
-						<BarChart data={projectStats}>
-							<CartesianGrid strokeDasharray="3 3" />
-							<XAxis dataKey="name" />
-							<YAxis />
-							<Tooltip />
-							<Legend />
-							<Bar dataKey="completed" fill="#0088FE" name="Completed Tasks" />
-							<Bar dataKey="total" fill="#00C49F" name="Total Tasks" />
-						</BarChart>
-					</ResponsiveContainer>
+				{/* Task Distribution */}
+				<div className="bg-white p-6 rounded-lg shadow-sm">
+					<h3 className="text-lg font-semibold mb-4">Task Distribution</h3>
+					<div className="h-80">
+						<ResponsiveContainer width="100%" height="100%">
+							<PieChart>
+								<Pie data={taskDistributionData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" dataKey="value" label>
+									{taskDistributionData.map((entry, index) => (
+										<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+									))}
+								</Pie>
+								<Tooltip />
+								<Legend />
+							</PieChart>
+						</ResponsiveContainer>
+					</div>
 				</div>
 
-				{/* Team Activity Chart */}
-				<div className="bg-white rounded-xl p-6 shadow-sm">
-					<h3 className="text-lg font-semibold mb-4">Team Activity</h3>
-					<ResponsiveContainer width="100%" height={300}>
-						<LineChart data={teamActivity}>
+				{/* Project Progress */}
+				<div className="bg-white p-6 rounded-lg shadow-sm">
+					<h3 className="text-lg font-semibold mb-4">Project Progress</h3>
+					<div className="h-80">
+						<ResponsiveContainer width="100%" height="100%">
+							<BarChart data={projectProgressData}>
+								<CartesianGrid strokeDasharray="3 3" />
+								<XAxis dataKey="name" />
+								<YAxis />
+								<Tooltip />
+								<Bar dataKey="progress" fill="#3b82f6" />
+							</BarChart>
+						</ResponsiveContainer>
+					</div>
+				</div>
+			</div>
+
+			{/* Team Activity Chart */}
+			<div className="bg-white p-6 rounded-lg shadow-sm">
+				<h3 className="text-lg font-semibold mb-4">Team Activity</h3>
+				<div className="h-80">
+					<ResponsiveContainer width="100%" height="100%">
+						<LineChart data={getTeamActivityData()}>
 							<CartesianGrid strokeDasharray="3 3" />
-							<XAxis dataKey="name" />
+							<XAxis dataKey="date" tickFormatter={(date) => new Date(date).toLocaleDateString(undefined, { weekday: "short" })} />
 							<YAxis />
 							<Tooltip />
 							<Legend />
-							<Line type="monotone" dataKey="tasksCompleted" stroke="#0088FE" name="Completed Tasks" />
-							<Line type="monotone" dataKey="tasksInProgress" stroke="#00C49F" name="Tasks in Progress" />
+							<Line type="monotone" dataKey="tasks" stroke="#3b82f6" name="New Tasks" strokeWidth={2} />
+							<Line type="monotone" dataKey="completed" stroke="#10b981" name="Completed Tasks" strokeWidth={2} />
 						</LineChart>
 					</ResponsiveContainer>
 				</div>
 			</div>
 
-			{/* Bottom Row */}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Project Distribution */}
-				<div className="bg-white rounded-xl p-6 shadow-sm">
-					<h3 className="text-lg font-semibold mb-4">Project Distribution</h3>
-					<ResponsiveContainer width="100%" height={300}>
-						<PieChart>
-							<Pie data={projectStatusData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-								{projectStatusData.map((entry, index) => (
-									<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-								))}
-							</Pie>
-							<Tooltip />
-							<Legend />
-						</PieChart>
-					</ResponsiveContainer>
-				</div>
-
-				{/* Upcoming Deadlines */}
-				<div className="bg-white rounded-xl p-6 shadow-sm col-span-2">
-					<h3 className="text-lg font-semibold mb-4">Upcoming Deadlines</h3>
-					<div className="space-y-4">
-						{upcomingDeadlines.map((task) => (
-							<div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-								<div className="flex items-center space-x-4">
-									<div
-										className={`
-                    p-2 rounded-full
-                    ${task.priority === "high" ? "bg-red-100" : task.priority === "medium" ? "bg-yellow-100" : "bg-green-100"}`}
-									>
-										<AlertTriangle className={`w-4 h-4 ${task.priority === "high" ? "text-red-600" : task.priority === "medium" ? "text-yellow-600" : "text-green-600"}`} />
-									</div>
-									<div>
-										<h4 className="font-medium">{task.title}</h4>
-										<p className="text-sm text-gray-500">{task.assignee?.name || "Unassigned"}</p>
-									</div>
+			{/* Recent Activity */}
+			<div className="bg-white rounded-lg p-6 shadow-sm">
+				<h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+				<div className="space-y-4">
+					{Object.values(tasks || {})
+						.flat()
+						.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+						.slice(0, 5)
+						.map((task) => (
+							<div key={task.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg transition-colors">
+								<div>
+									<h4 className="font-medium text-gray-900">{task.title}</h4>
+									<p className="text-sm text-gray-500">
+										{task.assignee ? `Assigned to ${task.assignee}` : "Unassigned"} • Due: {new Date(task.dueDate).toLocaleDateString()}
+									</p>
 								</div>
-								<div className="flex items-center space-x-2">
-									<Clock className="w-4 h-4 text-gray-400" />
-									<span className="text-sm text-gray-600">{new Date(task.dueDate).toLocaleDateString()}</span>
-								</div>
+								<span
+									className={`
+                  px-3 py-1 rounded-full text-xs font-medium
+                  ${task.priority === "high" ? "bg-red-100 text-red-800" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}
+                `}
+								>
+									{task.priority} Priority
+								</span>
 							</div>
 						))}
-					</div>
 				</div>
 			</div>
 		</div>
