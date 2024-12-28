@@ -1,8 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
-import { LogIn, User, Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
-
+import React, { useState, useEffect } from "react";
+import { LogIn, KeyRound, Mail, AlertCircle, Eye, EyeOff, Github, Loader2, ArrowRight, Info } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const LoginPage = () => {
@@ -13,50 +10,49 @@ const LoginPage = () => {
 	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+	const [loginStep, setLoginStep] = useState("email"); // email or password
+	const [emailValid, setEmailValid] = useState(false);
 
 	const { login } = useAuth();
-	const navigate = useNavigate();
 
-	const validateForm = () => {
-		if (!formData.email) {
-			setError("Email is required");
-			return false;
+	// Validate email as user types
+	useEffect(() => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		setEmailValid(emailRegex.test(formData.email));
+	}, [formData.email]);
+
+	// Demo user hints
+	const demoCredentials = [
+		{ email: "demo@example.com", hint: "Demo User (Password: 123)" },
+		{ email: "admin@taskflow.com", hint: "Admin User (Password: admin123)" },
+	];
+
+	const handleEmailSubmit = (e) => {
+		e.preventDefault();
+		if (emailValid) {
+			setLoginStep("password");
+		} else {
+			setError("Please enter a valid email address");
 		}
-		if (!formData.password) {
-			setError("Password is required");
-			return false;
-		}
-		return true;
 	};
 
-	const handleSubmit = async (e) => {
+	const handlePasswordSubmit = async (e) => {
 		e.preventDefault();
 		setError("");
-
-		// Basic form validation
-		if (!validateForm()) return;
-
 		setIsLoading(true);
 
 		try {
-			// Simulated authentication
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			// Simulated delay for demo
+			await new Promise((resolve) => setTimeout(resolve, 800));
 
-			// Demo credentials
 			const validCredentials = [
 				{
 					email: "demo@example.com",
 					password: "123",
 					userData: {
-						name: "John Doe",
-						email: "demo@example.com",
+						name: "Demo User",
 						role: "Product Manager",
 						avatar: null,
-						activity: {
-							tasksCompleted: 24,
-							tasksCreated: 45,
-							lastActive: new Date().toISOString(),
-						},
 					},
 				},
 				{
@@ -64,125 +60,166 @@ const LoginPage = () => {
 					password: "admin123",
 					userData: {
 						name: "Admin User",
-						email: "admin@taskflow.com",
-						role: "System Administrator",
+						role: "Administrator",
 						avatar: null,
-						activity: {
-							tasksCompleted: 50,
-							tasksCreated: 75,
-							lastActive: new Date().toISOString(),
-						},
 					},
 				},
 			];
 
-			const matchedCredential = validCredentials.find((cred) => cred.email === formData.email && cred.password === formData.password);
+			const matchedUser = validCredentials.find((cred) => cred.email.toLowerCase() === formData.email.toLowerCase() && cred.password === formData.password);
 
-			if (matchedCredential) {
-				login(matchedCredential.userData);
-
-				toast.success(`Welcome back, ${matchedCredential.userData.name}!`, {
-					position: "top-right",
-					autoClose: 3000,
-				});
-
-				navigate("/dashboard");
+			if (matchedUser) {
+				login(matchedUser.userData);
 			} else {
-				setError("Invalid email or password");
-				toast.error("Authentication failed", {
-					position: "top-right",
-					autoClose: 3000,
-				});
+				setError("Invalid password");
+				setFormData((prev) => ({ ...prev, password: "" }));
 			}
 		} catch (err) {
-			setError("An unexpected error occurred");
-			toast.error("Login failed", {
-				position: "top-right",
-				autoClose: 3000,
-			});
+			console.error(err);
+			setError("An error occurred. Please try again.");
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-			<div className="sm:mx-auto sm:w-full sm:max-w-md">
-				<h1 className="text-center text-4xl font-extrabold text-gray-900 mb-8">TaskFlow</h1>
+	// Find if current email matches a demo account
+	const demoHint = demoCredentials.find((cred) => cred.email.toLowerCase() === formData.email.toLowerCase());
 
-				<div className="bg-white py-8 px-4 shadow-lg rounded-xl sm:px-10">
-					<form className="space-y-6" onSubmit={handleSubmit}>
+	return (
+		<div className="min-h-screen flex flex-col">
+			{/* Top Navigation */}
+			<nav className="w-full p-4 flex justify-between items-center bg-white/80 backdrop-blur-sm fixed top-0 z-50">
+				<div className="flex items-center space-x-2">
+					<div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+						<span className="text-white font-bold">TF</span>
+					</div>
+					<span className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">TaskFlow</span>
+				</div>
+				<a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors">
+					<Github className="w-5 h-5 mr-2" />
+					<span className="hidden sm:inline">Source</span>
+				</a>
+			</nav>
+
+			{/* Main Content */}
+			<main className="flex-1 flex">
+				{/* Left Panel - Login Form */}
+				<div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+					<div className="w-full max-w-md space-y-8">
+						<div className="text-center lg:text-left">
+							<h1 className="text-2xl font-bold text-gray-900">{loginStep === "email" ? "Sign in to TaskFlow" : `Welcome back`}</h1>
+							<p className="mt-2 text-gray-600">{loginStep === "email" ? "Enter your email to get started" : `Signing in as ${formData.email}`}</p>
+						</div>
+
 						{/* Error Message */}
 						{error && (
-							<div className="flex items-center p-4 mb-4 text-red-700 bg-red-100 rounded-lg">
-								<AlertCircle className="w-5 h-5 mr-2" />
+							<div className="bg-red-50 text-red-700 p-4 rounded-lg flex items-start">
+								<AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
 								<span className="text-sm">{error}</span>
 							</div>
 						)}
 
-						{/* Email Input */}
-						<div>
-							<label htmlFor="email" className="block text-sm font-medium text-gray-700">
-								Email address
-							</label>
-							<div className="mt-1 relative">
-								<input id="email" name="email" type="email" autoComplete="email" required placeholder="demo@example.com" className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-								<User className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
-							</div>
-						</div>
-
-						{/* Password Input */}
-						<div>
-							<label htmlFor="password" className="block text-sm font-medium text-gray-700">
-								Password
-							</label>
-							<div className="mt-1 relative">
-								<input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="123" className="appearance-none block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-								<Lock className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
-								<button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
-									{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-								</button>
-							</div>
-						</div>
-
-						{/* Remember Me & Forgot Password */}
-						<div className="flex items-center justify-between">
-							<div className="flex items-center">
-								<input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
-								<label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-									Remember me
-								</label>
-							</div>
-
-							<div className="text-sm">
-								<a href="X" className="font-medium text-blue-600 hover:text-blue-500">
-									Forgot your password?
-								</a>
-							</div>
-						</div>
-
-						{/* Login Button */}
-						<div>
-							<button type="submit" disabled={isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300">
-								{isLoading ? (
-									<div className="flex items-center">
-										<svg className="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-										</svg>
-										Signing in...
+						{/* Login Forms */}
+						{loginStep === "email" ? (
+							// Email Step
+							<form onSubmit={handleEmailSubmit} className="space-y-6">
+								<div>
+									<div className="relative">
+										<Mail className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
+										<input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })} placeholder="demo@example.com" className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" autoFocus />
+										{emailValid && (
+											<div className="absolute right-3 top-3.5 text-green-500">
+												<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+												</svg>
+											</div>
+										)}
 									</div>
-								) : (
-									<>
-										<LogIn className="w-5 h-5 mr-2" />
-										Sign in
-									</>
+								</div>
+
+								<button
+									type="submit"
+									disabled={!emailValid}
+									className="w-full py-3 px-4 flex items-center justify-center text-white bg-blue-600 rounded-lg 
+                    hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 transition-all"
+								>
+									Continue
+									<ArrowRight className="w-5 h-5 ml-2" />
+								</button>
+
+								{/* Demo Account Hint */}
+								{demoHint && (
+									<div className="flex items-start space-x-2 text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+										<Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
+										<p>{demoHint.hint}</p>
+									</div>
 								)}
-							</button>
-						</div>
-					</form>
+							</form>
+						) : (
+							// Password Step
+							<form onSubmit={handlePasswordSubmit} className="space-y-6">
+								<div>
+									<div className="relative">
+										<KeyRound className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
+										<input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Enter your password" className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" autoFocus />
+										<button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600">
+											{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+										</button>
+									</div>
+								</div>
+
+								<div className="flex items-center justify-between">
+									<button
+										type="button"
+										onClick={() => {
+											setLoginStep("email");
+											setError("");
+										}}
+										className="text-sm text-gray-600 hover:text-gray-900 flex items-center"
+									>
+										<ArrowRight className="w-4 h-4 mr-1 rotate-180" />
+										Change email
+									</button>
+									<button type="button" className="text-sm text-blue-600 hover:text-blue-700">
+										Forgot password?
+									</button>
+								</div>
+
+								<button
+									type="submit"
+									disabled={isLoading || !formData.password}
+									className="w-full py-3 px-4 flex items-center justify-center text-white bg-blue-600 rounded-lg 
+                    hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 transition-all"
+								>
+									{isLoading ? (
+										<Loader2 className="w-5 h-5 animate-spin" />
+									) : (
+										<>
+											Sign in
+											<LogIn className="w-5 h-5 ml-2" />
+										</>
+									)}
+								</button>
+							</form>
+						)}
+					</div>
 				</div>
-			</div>
+
+				{/* Right Panel - Illustration (Only visible on lg screens) */}
+				<div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100 items-center justify-center p-8">
+					<div className="max-w-md text-center">
+						<div className="w-full h-64 bg-white rounded-2xl shadow-xl p-8 mb-8 flex items-center justify-center">
+							<svg className="w-full h-full text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+								<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+							</svg>
+						</div>
+						<h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to TaskFlow</h2>
+						<p className="text-gray-600">Streamline your workflow, collaborate seamlessly, and boost productivity with our intuitive task management platform.</p>
+					</div>
+				</div>
+			</main>
 		</div>
 	);
 };
