@@ -96,10 +96,6 @@ const LoginPage = () => {
 			}
 		} catch (err) {
 			setError("An unexpected error occurred");
-			toast.error("Login failed", {
-				position: "top-right",
-				autoClose: 3000,
-			});
 		} finally {
 			setIsLoading(false);
 		}
