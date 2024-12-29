@@ -75,12 +75,10 @@ const LoginPage = () => {
 				setFormData((prev) => ({ ...prev, password: "" }));
 			}
 		} catch (err) {
-<<<<<<< HEAD
 			console.error(err);
 			setError("An error occurred. Please try again.");
-=======
+
 			setError("An unexpected error occurred");
->>>>>>> 0fc8b21930c57e7b4cf5c79bf52b069e81535cf7
 		} finally {
 			setIsLoading(false);
 		}
